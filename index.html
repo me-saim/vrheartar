@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebAR with Three.js and VR</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: linear-gradient(135deg, #ff9a9e, #fad0c4);
+      touch-action: none;
+    }
+    canvas {
+      display: block;
+    }
+    #enterVRButton {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 10px 20px;
+      background-color: #ff4081;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+</head>
+<body>
+  <button id="enterVRButton">Enter VR</button>
+
+  <script>
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.xr.enabled = true; // Enable VR
+    document.body.appendChild(renderer.domElement);
+
+    const enterVRButton = document.getElementById('enterVRButton');
+    enterVRButton.addEventListener('click', () => {
+      renderer.xr.setSession(renderer.xr.getSession() ? null : navigator.xr.requestSession('immersive-vr'));
+    });
+
+    // Add lights
+    const lightAbove = new THREE.DirectionalLight(0xffffff, 1);
+    lightAbove.position.set(0, 1, 0);
+    scene.add(lightAbove);
+
+    const lightBelow = new THREE.PointLight(0xffffff, 1);
+    lightBelow.position.set(0, -1, 0);
+    scene.add(lightBelow);
+
+    let model;
+    const loader = new THREE.GLTFLoader();
+    loader.load('heartar.6.glb', function (gltf) {
+      model = gltf.scene;
+      model.scale.set(0.5, 0.5, 0.5);
+      model.position.set(0, -0.5, 0);
+      scene.add(model);
+    });
+
+    camera.position.set(0, 0, 3);
+
+    let isDragging = false;
+    let previousX = 0;
+    let previousY = 0;
+
+    function onPointerDown(event) {
+      isDragging = true;
+      previousX = event.clientX || event.touches[0].clientX;
+      previousY = event.clientY || event.touches[0].clientY;
+    }
+
+    function onPointerMove(event) {
+      if (!isDragging) return;
+
+      const currentX = event.clientX || event.touches[0].clientX;
+      const currentY = event.clientY || event.touches[0].clientY;
+
+      const deltaX = (currentX - previousX) * 0.01;
+      const deltaY = (currentY - previousY) * 0.01;
+
+      if (model) {
+        model.rotation.y += deltaX;
+        model.rotation.x += deltaY;
+      }
+
+      previousX = currentX;
+      previousY = currentY;
+    }
+
+    function onPointerUp() {
+      isDragging = false;
+    }
+
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('mousemove', onPointerMove);
+    document.addEventListener('mouseup', onPointerUp);
+    document.addEventListener('touchstart', onPointerDown);
+    document.addEventListener('touchmove', onPointerMove);
+    document.addEventListener('touchend', onPointerUp);
+
+    function handleGamepadInput() {
+      const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+      const gp = gamepads[0];
+
+      if (gp && model) {
+        const deltaX = gp.axes[0] * 0.05; // Horizontal movement
+        const deltaY = gp.axes[1] * 0.05; // Vertical movement
+
+        model.rotation.y += deltaX;
+        model.rotation.x += deltaY;
+      }
+    }
+
+    function animate() {
+      renderer.setAnimationLoop(() => {
+        handleGamepadInput();
+        renderer.render(scene, camera);
+      });
+    }
+
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
